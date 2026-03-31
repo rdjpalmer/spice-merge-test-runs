@@ -1,0 +1,28 @@
+name: Close stale pull requests
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+      timezone: Europe/London
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  close-stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close PRs open longer than 24 hours
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          while IFS= read -r num; do
+            [ -z "$num" ] && continue
+            gh pr close "$num" --repo "$REPO" \
+              --comment "Automatically closed: this pull request has been open for more than 24 hours."
+          done < <(gh pr list --repo "$REPO" --state open --json number,createdAt \
+            | jq -r '.[] | select((now - (.createdAt | fromdateiso8601)) > 86400) | .number')
